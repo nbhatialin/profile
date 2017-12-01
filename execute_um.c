@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include "assert.h"
 
-#include "bitpack.h"
 #include "um.h"
 #include "um_load.h"
 
@@ -64,18 +63,39 @@ void run_um(Um_T um)
 
         Um_opcode opcode = 0;
         while(1) {
-                uint32_t curr_word = next_program_elem(um);
-                opcode = Bitpack_getu(curr_word, 4, 28);
+                uint64_t curr_word = next_program_elem(um);
+                opcode = (curr_word << 32) >> 60; 
                 assert(opcode <= max_ops);
                 if (opcode == LV) {
-                        int a = Bitpack_getu(curr_word, 3, 25);
+                        uint32_t a = (curr_word << 36) >> 61; 
                         lv(um, a);
                 }
                 else {
-                        int c = Bitpack_getu(curr_word, 3, 0);
-                        int b = Bitpack_getu(curr_word, 3, 3);
-                        int a = Bitpack_getu(curr_word, 3, 6);
+                        uint32_t c = (curr_word << 61) >> 61; 
+                        uint32_t b = (curr_word << 58) >> 61; 
+                        uint32_t a = (curr_word << 55) >> 61; 
                         operations[opcode](um, a, b, c);
                 }
         }
+}
+
+static inline uint64_t shl(uint64_t word, unsigned bits)
+{
+        assert(bits <= 64);
+        if (bits == 64)
+                return 0;
+        else
+                return word << bits;
+}
+
+/*
+ * shift R logical
+ */
+static inline uint64_t shr(uint64_t word, unsigned bits)
+{
+        assert(bits <= 64);
+        if (bits == 64)
+                return 0;
+        else
+                return word >> bits;
 }

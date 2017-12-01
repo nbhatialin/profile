@@ -10,7 +10,6 @@
 #include <stdio.h>
 #include <assert.h>
 #include <mem.h>
-#include "bitpack.h"
 
 #include "um.h"
 
@@ -230,8 +229,10 @@ void loadp(T um, int a, int b, int c)
 */
 void lv(T um, int a)
 {
-        uint32_t word = get_program_elem(um->segments, um->program_counter);
-        uint32_t value = Bitpack_getu(word, 25, 0);
+        uint64_t word = get_program_elem(um->segments, um->program_counter);
+    
+        uint32_t value = (word << 39) >> 39;
+
         um->registers[a] = value;
         um->program_counter++;
 }
