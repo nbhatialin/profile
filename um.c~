@@ -1,0 +1,165 @@
+#include <stdio.h>
+#include <assert.h>
+#include <mem.h>
+#include "bitpack.h"
+
+#include "um.h"
+
+#define T Um_T
+#define max_bound 4294967296
+#define eof 26
+#define num_registers 8
+
+struct T {
+       	Segments_T segments;
+       	register_val registers[num_registers];
+        counter_type program_counter; 
+};
+
+T new_um(void *program)
+{
+        T um_new;
+        NEW(um_new);
+        um_new->segments = new_segments(program);
+        um_new->program_counter = 0;
+        for (int i = 0; i < num_registers; i++) {
+                um_new->registers[i] = 0;            
+        }
+        return um_new;
+}
+
+int program_length(T um) 
+{
+        return program_size(um->segments);
+}
+
+void free_um(T um)
+{
+        free_segments(um->segments);
+        FREE(um);
+}
+
+uint32_t next_program_elem(T um) {
+        return get_program_elem(um->segments, um->program_counter);
+}
+
+/*
+* Cmov: Takes in the um and 3 register indexes. If the register at c isnt 0,
+* copies register at b into register at a.
+*/
+void cmov(T um, int a, int b, int c)
+{
+        if (um->registers[c] != 0) {
+                um->registers[a] = um->registers[b];
+        }
+        um->program_counter++;
+}
+
+void sload(T um, int a, int b, int c)
+{
+        um->registers[a] = get_segment_elem(um->segments, um->registers[b], 
+                um->registers[c]);
+        um->program_counter++;
+} 
+
+void sstore(T um, int a, int b, int c)
+{
+        put_segment_elem(um->segments, um->registers[a], um->registers[b], 
+                um->registers[c]);
+
+        um->program_counter++;
+}
+
+void add(T um, int a, int b, int c)
+{
+        um->registers[a] = (um->registers[b] + um->registers[c]) % max_bound;
+        um->program_counter++;
+}
+
+void mul(T um, int a, int b, int c)
+{
+        um->registers[a] = (um->registers[b] * um->registers[c]) % max_bound;
+        um->program_counter++;
+}
+
+void divide(T um, int a, int b, int c)
+{
+        if (um->registers[c] == 0) {
+                printf("poor\n");
+                exit(1);
+        }
+        um->registers[a] = (um->registers[b] / um->registers[c]);
+        um->program_counter++;
+}
+
+void nand(T um, int a, int b, int c)
+{
+        um->registers[a] = ~(um->registers[b] & um->registers[c]);
+        um->program_counter++;
+}
+
+void halt(T um, int a, int b, int c)
+{
+        (void)a;
+        (void)b;
+        (void)c;
+        free_um(um);
+        exit(0);
+}
+
+void map(T um, int a, int b, int c)
+{
+        (void)a;
+        um->registers[b] = add_segment(um->segments, um->registers[c]);
+        um->program_counter++;
+}
+
+void unmap(T um, int a, int b, int c)
+{
+        (void)a;
+        (void)b;
+        remove_segment(um->segments, um->registers[c]);
+        um->program_counter++;
+}
+
+void out(T um, int a, int b, int c)
+{
+        (void)a;
+        (void)b;
+        assert(um->registers[c] < 256);
+        putc(um->registers[c], stdout);
+        um->program_counter++;
+}
+
+void in(T um, int a, int b, int c)
+{
+        (void)a;
+        (void)b;
+        char input = getc(stdin);
+        if (input == eof) {
+                um->registers[c] = (max_bound - 1);
+        }
+        else {
+                um->registers[c] = input;
+        }
+        um->program_counter++;
+}
+
+void loadp(T um, int a, int b, int c)
+{
+        (void)a;
+        if (um->registers[b] != 0) {
+                replace_program(um->segments, get_segment(um->segments, um->registers[b]));
+        }
+        um->program_counter = um->registers[c];
+}
+
+void lv(T um, int a)
+{
+        uint32_t word = get_program_elem(um->segments, um->program_counter);
+        uint32_t value = Bitpack_getu(word, 25, 0);
+        um->registers[a] = value;
+        um->program_counter++;
+}
+
+#undef T

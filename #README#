@@ -1,0 +1,57 @@
+README
+    By Nikhil Bhatia-Lin, Charlie Caron, 11/27/17
+    HW6: UM
+
+1. We did not recieve any help from TAs or other students on this assignment
+
+2. We believe all aspects of this program have been correctly implemented. 
+Time taken to execute the midmark is a bit more than we aimed for, but still 
+under the 10 second mark.
+
+3. Significant departures:
+    Using a sequence to hold segments instead of a table
+    Made unpack a part of run_um, Added a full segments interface, added 
+    aspects to the um interface. Created a sequence in the segments 
+    implementation to hold ids.
+
+4. Architecture:
+    1 - Segments
+        Uses a sequence to hold all of the segments. An individual segment 
+        is represented as a struct containing both a UArray (which hold words)
+        as well as an int that is either 0 or 1 and indicates whether the 
+        segment is currently mapped (for checking whether access is good. The 
+        Segments struct also contains a stack containing all of the unmapped 
+        ids which are available for  reuse. The big secrets this module knows 
+        are how the segments are stored (they are stored in a sequence). In addition, freeing segments only when the id is to be reused (even after removal) is a key this implementation relies on.
+    2 - Um
+        Uses an array of uint32_ts to hold the registers, a uint32_t to hold the program counter, and a Segments_T to hold the segments. Relies on
+        segments, essentially wrapping segments functions and passing them 
+        register values & registers for information storage. 
+    3 - Um_load
+        Is a standalone component. Used by execute_um to turn a file into a sequence which can then be passed to the um/segments to initialize a um. Hides the fact that it is reading into a sequence by returning a void pointer.
+    4 - Execute_um 
+        Uses um_load/load_um to load the inital program from a file and pass this to create a new um. Run function uses bitpack & a um function that returns the next word based to the program counter in order to iterate through and execute instructions. 
+
+5. Explains how long it takes your UM to execute 50 million instructions, and how you know.
+   Since midmark has 80 million instructions, and our UM takes about 3.4 seconds
+   to complete midmark, we are counfident that our UM can execute 50 million 
+instructions in about 
+6. 
+Halt test: Runs the halt instruction, program should end. No input or output
+Verbose halt test: Program should halt. If no halt, program will output Bad!
+Output halt: Program should output the null character then halt
+In_out: Program runs input (A) then runs output on the same register. Should output A then halt
+Print digit: Loads two values, 48, 22, adds them then outputs the result, then halts. Should output F
+Print multi: Loads two values, 10, 7, multiplies them then outputs the result, then halts. Should output F
+Fail output: Loads one value, 1000, outputs that value. Should fail
+Print div: Loads two values, 140, 2, divides them then outputs the result, then halts. Should output F
+Fail div: Loads two values, 2, 0, divides them then outputs the result. Should fail bc divide by zero
+Add segment: Loads 40 into r1, maps a segment (id in r2), loads 70 into r3, loads 20 into r1. Stores r3 into m[r2][r1]. Loads an arbitrary number into r3, then loads m[r2][r1] stores it in r3. Outputs r3 to ensure that the correct value was loaded. Unmaps the segment, then tries to output m[r2][r1] again. Should fail.
+Loadp: Loads 0 into r1, 4 into r2. Does loadp, which should set the program counter to r2. This will make it skip the halt instruction and move to loadval which loads value 70 to r3, then outputs it. Correct output will be F.
+Cmov: loads 2 into r3, loads 70 into r2, performs the cmov instruction which checks if r3 is 0, since it is not, it moves r2 to r1, then outputs r1.
+Nand: Loads 4294967295 into r1, 4294967225 into r2. Performs bitwise nand, should return the letter F.
+
+
+7. We spent approximately 4 hours analyzing the assignment
+8. We spent approximately 4 hours preparing the design doc
+9. We spent approximately 25 hours solving the problems after our analysis

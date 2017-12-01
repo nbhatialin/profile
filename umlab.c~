@@ -1,0 +1,289 @@
+/*
+ * umlab.c
+ * 
+ * The functions defined in this lab should be linked against umlabwrite.c
+ * to produce a unit test writing program. Any additional functions and unit
+ * tests written for the lab go here.
+ */
+
+#include <stdint.h>
+#include <stdio.h>
+
+#include <assert.h>
+#include <seq.h>
+
+#include <bitpack.h>
+
+#define register_width 3
+#define instruct_width 4
+#define val_width 25
+#define byte_width 8
+void in_out(Seq_T stream);
+void emit_print_digit(Seq_T stream);
+void emit_print_mult(Seq_T stream);
+void fail_output(Seq_T stream);
+void emit_print_div(Seq_T stream);
+void emit_fail_div(Seq_T stream);
+void emit_add_seg(Seq_T stream);
+void emit_loadp(Seq_T stream);
+void emit_cmov(Seq_T stream);
+void emit_bitwise_nand(Seq_T stream);
+
+typedef uint32_t Um_instruction;
+typedef enum Um_opcode {
+        CMOV = 0, SLOAD = 1, SSTORE = 2, ADD = 3, MUL = 4, DIV = 5,
+        NAND = 6, HALT = 7, ACTIVATE = 8, INACTIVATE = 9, OUT = 10, 
+        IN = 11, LOADP = 12, LV = 13
+} Um_opcode;
+
+
+/* Functions that return the two instruction types */
+
+Um_instruction three_register(Um_opcode op, int ra, int rb, int rc);
+Um_instruction loadval(unsigned ra, unsigned val);
+
+
+/* Wrapper functions for each of the instructions */
+
+static inline Um_instruction halt(void) 
+{
+        return three_register(HALT, 0, 0, 0);
+}
+
+typedef enum Um_register { r0 = 0, r1 = 1, r2 = 2, r3 = 3, r4 = 4, r5 = 5, 
+        r6 = 6, r7 = 7 } Um_register;
+
+static inline Um_instruction add(Um_register a, Um_register b, Um_register c) 
+{
+        return three_register(ADD, a, b, c);
+}
+
+Um_instruction output(Um_register c);
+
+/* Functions for working with streams */
+
+static inline void emit(Seq_T stream, Um_instruction inst)
+{
+        assert(sizeof(inst) <= sizeof(uintptr_t));
+        Seq_addhi(stream, (void *)(uintptr_t)inst);
+}
+
+extern void Um_write_sequence(FILE *output, Seq_T stream);
+
+
+
+Um_instruction three_register(Um_opcode op, int ra, int rb, int rc)
+{
+        uint64_t word = Bitpack_newu(0, register_width, 0, rc);
+        word = Bitpack_newu(word, register_width, 3, rb);
+        word = Bitpack_newu(word, register_width, 6, ra);
+        word = Bitpack_newu(word, instruct_width, 28, op);
+        return word;
+}
+
+static inline Um_instruction output(Um_register c)
+{
+        return three_register(OUT, 0, 0, c);
+}
+
+static inline Um_instruction input(Um_register c)
+{
+	return three_register(IN, 0, 0, c);
+}
+
+static inline Um_instruction mul(Um_register a, Um_register b, Um_register c)
+{
+	return three_register(MUL, a, b, c);
+}
+
+static inline Um_instruction div(Um_register a, Um_register b, Um_register c)
+{
+	return three_register(DIV, a, b, c);
+}
+
+static inline Um_instruction sstore(Um_register a, Um_register b, Um_register c)
+{
+	return three_register(SSTORE, a, b, c);
+}
+
+static inline Um_instruction sload(Um_register a, Um_register b, Um_register c)
+{
+	return three_register(SLOAD, a, b, c);
+}
+
+static inline Um_instruction cmov(Um_register a, Um_register b, Um_register c)
+{
+	return three_register(CMOV, a, b, c);
+}
+
+static inline Um_instruction nand(Um_register a, Um_register b, Um_register c)
+{
+	return three_register(NAND, a, b, c);
+}
+
+static inline Um_instruction activate(Um_register b, Um_register c)
+{
+	return three_register(ACTIVATE, 0, b, c);
+}
+
+static inline Um_instruction inactivate(Um_register b, Um_register c)
+{
+	return three_register(INACTIVATE, 0, b, c);
+}
+
+static inline Um_instruction loadp(Um_register b, Um_register c)
+{
+	return three_register(LOADP, 0, b, c);
+}
+
+static inline Um_instruction loadval(unsigned ra, unsigned val)
+{
+        uint64_t word = Bitpack_newu(0, val_width, 0, val);
+        word = Bitpack_newu(word, register_width, 25, ra);
+        word = Bitpack_newu(word, instruct_width, 28, LV);
+        return word;
+}
+
+void Um_write_sequence(FILE *output, Seq_T stream)
+{
+        int length = Seq_length(stream);
+        for (int i = 0; i < length; i++) {
+                uint32_t word = (uint32_t)(uintptr_t)Seq_remlo(stream);
+                for (int j = 24; j >= 0; j -= byte_width) {
+                        char c = Bitpack_getu(word, byte_width, j);
+                        fputc(c, output);
+                }
+        }
+}
+
+
+/* Unit tests for the UM */
+
+void emit_halt_test(Seq_T stream)
+{
+        emit(stream, halt());
+}
+
+void emit_add_test(Seq_T stream)
+{
+        emit(stream, add(r1, r2, r3));
+        emit(stream, halt());
+}
+
+/* no input, no output */
+void emit_verbose_halt_test(Seq_T stream)
+{
+        emit(stream, halt());
+        emit(stream, loadval(r1, 'B'));
+        emit(stream, output(r1));
+        emit(stream, loadval(r1, 'a'));
+        emit(stream, output(r1));
+        emit(stream, loadval(r1, 'd'));
+        emit(stream, output(r1));
+        emit(stream, loadval(r1, '!'));
+        emit(stream, output(r1));
+        emit(stream, loadval(r1, '\n'));
+        emit(stream, output(r1));
+}
+
+
+/* input should be A, output should be A */
+void in_out(Seq_T stream)
+{
+	emit(stream, input(r2));
+	emit(stream, output(r2));
+	emit(stream, halt());
+}
+/* no input, output should be the character F */
+void emit_print_digit(Seq_T stream)
+{
+        emit(stream, loadval(r1, 48));
+        emit(stream, loadval(r2, 22));
+        emit(stream, add(r3, r1, r2));
+        emit(stream, output(r3));
+        emit(stream, halt());
+}
+
+/* no input, output should be the character F */
+void emit_print_mult(Seq_T stream)
+{
+	emit(stream, loadval(r1, 10));
+	emit(stream, loadval(r2, 7));
+	emit(stream, mul(r3, r1, r2));
+	emit(stream, output(r3));
+	emit(stream, halt());
+}
+/* should fail */
+void fail_output(Seq_T stream)
+{
+	emit(stream, loadval(r1, 1000));
+	emit(stream, output(r1));
+	emit(stream, halt());
+}
+
+/* no input, output should be the character F */
+void emit_print_div(Seq_T stream)
+{
+	emit(stream, loadval(r1, 140));
+	emit(stream, loadval(r2, 2));
+	emit(stream, div(r3, r1, r2));
+	emit(stream, output(r3));
+	emit(stream, halt());
+}
+
+/* no input, should fail */
+void emit_fail_div(Seq_T stream)
+{
+	emit(stream, loadval(r1, 2));
+	emit(stream, loadval(r2, 0));
+	emit(stream, div(r3, r1, r2));
+	emit(stream, output(r3));
+	emit(stream, halt());
+}
+
+/* no input, should output F */
+void emit_add_seg(Seq_T stream)
+{
+	emit(stream, loadval(r1, 40));
+	emit(stream, activate(r2, r1));
+	emit(stream, loadval(r3, 70));
+	emit(stream, loadval(r1, 20));
+	emit(stream, sstore(r2, r1, r3));
+	emit(steam, loadval(r3, 300));
+	emit(stream, sload(r3, r2, r1));
+	emit(stream, output(r3));
+	emit(stream, inactivate(r2));
+	emit(stream, sload(r3, r2, r1));
+	emit(stream, output(r3));
+}
+
+/*no input, should output F */
+void emit_loadp(Seq_T stream)
+{
+	emit(stream, loadval(r1, 0));
+	emit(stream, loadval(r2, 4));
+	emit(stream, loadp(r1, r3));
+	emit(stream, halt());
+	emit(stream, loadval(r3, 70));
+	emit(stream, output(r3));
+}
+
+/* no input, should output F */
+void emit_cmov(Seq_T stream)
+{
+	emit(stream, loadval(r3, 2));
+	emit(stream, loadval(r2, 70));
+	emit(stream, cmov(r1, r2, r3));
+	emit(stream, output(r1));
+}
+
+/* no input, output should be F */
+void emit_bitwise_nand(Seq_T stream)
+{
+	emit(stream, loadval(r2, 4294967295));
+	emit(stream, loadval(r1, 4294967225));
+	emit(stream, nand(r3, r1, r2));
+	emit(stream, out(r3);	
+}
+	
+	     

@@ -1,0 +1,110 @@
+Full Universal Machine
+1. Major Components and Interfaces
+1. A global table which holds segments
+2. read_program
+   1. Module that opens a file, reads in everything in the file, parses it by
+    32-bit words, and stores each word into the 0 key of the Hanson table (see 
+    Segment Documentation).
+Interface:
+* void read_program(Table mem, FILE * fp)
+   * (possible helper functions)
+1. Um_Instructions
+        Description: This module will contain c-code defining all of the 
+        operations. 
+        Interface:
+* void cmov(register_ptr a, register_ptr b, register_ptr c)
+* void sload(register_ptr a, register_ptr b, register_ptr c) 
+* void sstore(register_ptr a, register_ptr b, register_ptr c)
+* void add(register_ptr a, register_ptr b, register_ptr c)
+* void mul(register_ptr a, register_ptr b, register_ptr c)
+* void div(register_ptr a, register_ptr b, register_ptr c)
+* void nand(register_ptr a, register_ptr b, register_ptr c)
+* void halt()
+* void activate(register_ptr b, register_ptr c)
+* void inactivate(register_ptr c)
+* void out(register_ptr c)
+* void in(register_ptr c)
+* void loadp(register_ptr b)
+* void lv(register_ptr a, int val)
+
+
+Unpack
+Description: The unpack module contains one function which takes a 
+Um_instruction (uint32_t), and unpacks the codeword to retrieve four values -- 
+a, b, c, and instr. These values will be stored in an instruction struct (
+Instruction_data) and returned.
+Interface:
+Instruction_data unpack(Um_instruction instruct)
+
+
+Run_program
+* The function that simulates the execution of a program in the universal 
+machine. A for loop iterates through segment 0 (an array of 32-bit words), 
+unpacks each word, and calls the associated instruction on the given registers.
+* Interface: void run_program();
+1. Architecture
+Numbers Denote Modules, letters denote contained functions
+1. Read Program - Includes the following components:
+   A. Read - opens a file, reads in everything in the file, parses it by 
+   32-bit words, and stores each word into the 0 key of the Hanson table
+1. Run Program - Includes the following components:
+   A. Run - loop iterates through segment 0, unpacks each word, and calls the 
+   associated instruction on the given registers.
+3 - Unpack
+4 - Um_Instructions
+1. Unpack - Includes the following components:
+   A. Unpack_word - retrieves up to 3 register numbers and 4 values from a 
+   given word
+1. Um_instructions - Includes the following components:
+All 14 operations as public functions
+
+
+
+
+
+
+
+
+
+
+
+
+UM Segments
+1. Representation
+Our segments will be held in a Hanson Table, where the 32-bit number used to 
+identify a segment will be the key. The corresponding values will be the 
+segments themselves which will be represented by arrays, where the size of 
+each array is set in the segment mapping function. Each element in the array 
+will hold a 32-bit word. When a segment is unmapped, we will use the Table 
+remove function to remove the key-value pair, so that the identifier can be 
+reused.
+1. Invariants
+   1. The 0 key in the Table will always correspond to the program -- an array 
+   of 32-bit instructions
+   2. Every 32-bit identifier/key will be being used 0 or 1 times at any given 
+   time
+   3. The number of key-value pairs will never be greater than 2^32.
+   4. The size of an array representing a segment will never be greater than 
+   2^32.
+1. Test Cases
+* Test when the initial file is empty
+   * Should result in a checked runtime error
+* Test when initial file does not exist
+   * Should result in a checked runtime error
+* Test when a segment with the 1 ID is added
+   * Should be fine
+* Test when a segment is added with length 0
+   * Should be fine, just inaccessible
+* Test when a segment is added with length 2^32
+   * Should be fine
+* Test when a segment with negative length or length above 2^32 is added
+   * Should result in an unchecked runtime error
+* Test when more than one segment is added
+   * Should be possible/accessible to check
+* Test when more than 2^32 segments are added
+   * Should result in an unchecked runtime error
+* Attempt to access different words within segments to ensure they are correct
+* Attempt to access words that are out of bounds
+   * Should result in an unchecked runtime error
+* Attempt to access segments that are out of bounds
+   * Should result in an unchecked runtime error
