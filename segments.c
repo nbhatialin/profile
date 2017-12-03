@@ -113,14 +113,6 @@ Umsegment_Id add_segment(T segments, uint32_t length)
 }
 
 /*
-* Returns the length of the program, for use by execute_um
-*/
-int program_size(T segments) 
-{
-        return Seq_length(segments->program);
-}
-
-/*
 * Replaces the program (stored at segment zero) given a pointer to the new 
 * program and the Segments struct. Calls get segment (static). Turns a UArray
 * into a sequence and sets it as the program.

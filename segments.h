@@ -18,7 +18,6 @@ typedef uint32_t Umsegment_Id;
 
 T new_segments(void *init_program);
 Umsegment_Id add_segment(T segments, uint32_t length);
-int program_size(T segments);
 void replace_program(T segments, Umsegment_Id id);
 uint32_t get_program_elem(T segments, uint32_t index);
 void remove_segment(T segments, Umsegment_Id id);

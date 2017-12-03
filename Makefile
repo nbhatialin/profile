@@ -49,7 +49,7 @@ INCLUDES = $(shell echo *.h)
 
 ############### Rules ###############
 
-all: segmentstest umtest um
+all: umtest um
 
 
 ## Compile step (.c files -> .o files)
@@ -60,15 +60,13 @@ all: segmentstest umtest um
 
 
 ## Linking step (.o -> executable program)
-segmentstest: segments.o um_load.o segmentstest.o 
+
+umtest: um.o um_load.o umtest.o 
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)
 
-umtest: segments.o um.o um_load.o umtest.o 
-	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)
-
-um: segments.o um.o um_load.o execute_um.o 
+um: um.o um_load.o execute_um.o 
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)
 
 clean:
-	rm -f segmentstest umtest um *.o
+	rm -f umtest um *.o
 

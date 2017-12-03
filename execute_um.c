@@ -10,7 +10,6 @@
  */ 
 #include <stdio.h>
 #include "assert.h"
-
 #include "um.h"
 #include "um_load.h"
 
@@ -77,25 +76,4 @@ void run_um(Um_T um)
                         operations[opcode](um, a, b, c);
                 }
         }
-}
-
-static inline uint64_t shl(uint64_t word, unsigned bits)
-{
-        assert(bits <= 64);
-        if (bits == 64)
-                return 0;
-        else
-                return word << bits;
-}
-
-/*
- * shift R logical
- */
-static inline uint64_t shr(uint64_t word, unsigned bits)
-{
-        assert(bits <= 64);
-        if (bits == 64)
-                return 0;
-        else
-                return word >> bits;
 }

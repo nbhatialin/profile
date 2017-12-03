@@ -20,7 +20,6 @@ typedef uint32_t register_val;
 typedef uint32_t counter_type;
 
 T new_um(void *program);
-int program_length(T um);
 uint32_t next_program_elem(T um);
 void free_um(T um);
 
