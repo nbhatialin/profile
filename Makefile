@@ -49,7 +49,7 @@ INCLUDES = $(shell echo *.h)
 
 ############### Rules ###############
 
-all: umtest um
+all: umtest um seqtest
 
 
 ## Compile step (.c files -> .o files)
@@ -64,9 +64,12 @@ all: umtest um
 umtest: um.o um_load.o umtest.o 
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)
 
-um: um.o um_load.o execute_um.o 
+um: um_load.o execute_um.o 
+	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)
+
+seqtest: sequence.o seqtest.o 
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)
 
 clean:
-	rm -f umtest um *.o
+	rm -f umtest um seqtest *.o
 
