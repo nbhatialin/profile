@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <assert.h>
 #include <mem.h>
-#include "seq.h"
 #include "uarray.h"
 #include "except.h"
 
@@ -19,6 +18,7 @@
 #include "execute_um.h"
 
 #define T Um_T
+#define S Sequence_T
 #define max_bound 4294967296
 #define eof 26
 #define num_registers 8
@@ -37,11 +37,17 @@ typedef enum Um_opcode {
 typedef void (*func_type)();
 
 struct T {
-        Seq_T program;
-        Seq_T storage;
-        Seq_T avail_id;
+        Sequence_T program;
+        Sequence_T storage;
+        Sequence_T avail_id;
         register_val registers[num_registers];
         counter_type program_counter; 
+};
+
+struct S {
+        elem_ptr *sequence;
+        int sequenceCapacity;
+        int length;
 };
 
 /*
@@ -57,6 +63,7 @@ typedef struct seg
 void run_um(Um_T um);
 static T new_um(void *program);
 static void free_um(T um);
+
 
 int main(int argc, char *argv[]) 
 {
@@ -100,7 +107,13 @@ void run_um(Um_T um)
                 /* Replaced
                 uint64_t curr_word = next_program_elem(um);
                 */
-                uint32_t *elem = Seq_get(um->program, um->program_counter);
+                //uint32_t *elem = seq_get(um->program, um->program_counter);
+                // Paramaters
+                int index = um->program_counter;
+                assert(index < um->program->length);
+                assert(index >= 0);
+                uint32_t *elem = um->program->sequence[index];
+
                 uint64_t curr_word = *elem;
 
 
@@ -111,8 +124,8 @@ void run_um(Um_T um)
                         /* Replaced
                         lv(um, a);
                         */
-                        uint64_t *word = Seq_get(um->program, um->program_counter);
-                        uint32_t value = (*word << 39) >> 39;
+                        //uint64_t *word = seq_get(um->program, um->program_counter);
+                        uint32_t value = (curr_word << 39) >> 39;
                         um->registers[a] = value;
                         um->program_counter++;
                 }
@@ -129,27 +142,31 @@ void run_um(Um_T um)
                                 um->program_counter++;
                         }
                         else if (opcode == SLOAD) {
-                                uint32_t id = um->registers[b];
-                                uint32_t index = um->registers[c];
+                                int id = um->registers[b];
+                                int index = um->registers[c];
                                 //check_unmap(segments, id);
-                                if (Seq_length(um->storage) <= (int)id) {
+                                if ((um->storage->length) <= (int)id) {
                                         printf("poor\n");
                                         exit(1);
                                 }
-                                if (id != program_id) {
-                                        seg check_seg = Seq_get(um->storage, id);
+
+                                if (id == program_id) {
+                                        //uint32_t *index_val = seq_get(um->program, index);
+                                        assert(index < um->program->length);
+                                        assert(index >= 0);
+                                        uint32_t *index_val = um->program->sequence[index];
+                                        um->registers[a] = *index_val;
+                                } else {
+                                        //seg check_seg = seq_get(um->storage, id);
+                                        assert(id < um->storage->length);
+                                        assert(id >= 0);
+                                        seg check_seg = um->storage->sequence[id];
                                         if (check_seg->mapped == 0) {
                                                 printf("poor\n");
                                                 exit(1);
                                         }
-                                }
-
-                                if (id == program_id) {
-                                        uint32_t *index_val = Seq_get(um->program, index);
-                                        um->registers[a] = *index_val;
-                                } else {
-                                        seg get_seg = Seq_get(um->storage, id);
-                                        UArray_T get_segment = get_seg->segment;
+                                        //seg get_seg = seq_get(um->storage, id);
+                                        UArray_T get_segment = check_seg->segment;
                                         uint32_t *index_val = UArray_at(get_segment, index);
                                         um->registers[a] = *index_val;
                                 }
@@ -157,30 +174,35 @@ void run_um(Um_T um)
                                 um->program_counter++;
                         }
                         else if (opcode == SSTORE) {
-                                uint32_t id = um->registers[a];
-                                uint32_t index = um->registers[b];
+                                int id = um->registers[a];
+                                int index = um->registers[b];
                                 uint32_t add = um->registers[c];
 
                                 // check_unmap(segments, id);
-                                if (Seq_length(um->storage) <= (int)id) {
+                                if (um->storage->length <= (int)id) {
                                         printf("poor\n");
                                         exit(1);
                                 }
-                                if (id != program_id) {
-                                        seg check_seg = Seq_get(um->storage, id);
+
+                                if (id == program_id) {
+                                        //uint32_t *index_val = seq_get(um->program, index);
+
+                                        assert(index < um->program->length);
+                                        assert(index >= 0);
+                                        uint32_t *index_val = um->program->sequence[index];
+                                        *index_val = add; 
+                                }
+                                else {
+                                        //seg check_seg = seq_get(um->storage, id);
+                                        assert(id < um->storage->length);
+                                        assert(id >= 0);
+                                        seg check_seg = um->storage->sequence[id];
                                         if (check_seg->mapped == 0) {
                                                 printf("poor\n");
                                                 exit(1);
                                         }
-                                }
-
-                                if (id == program_id) {
-                                        uint32_t *to_free = Seq_get(um->program, index);
-                                        *to_free = add; 
-                                }
-                                else {
-                                        seg get_seg = Seq_get(um->storage, id);
-                                        UArray_T get_segment = get_seg->segment;
+                                        //seg get_seg = seq_get(um->storage, id);
+                                        UArray_T get_segment = check_seg->segment;
                                         uint32_t *old_val = UArray_at(get_segment, index);
                                         *old_val = add;
                                 }
@@ -215,20 +237,51 @@ void run_um(Um_T um)
                                 uint32_t length = um->registers[c];
 
                                 UArray_T new_segment = UArray_new(length, word_size);
-                                if (Seq_length(um->avail_id) == 0) {
+                                if (um->avail_id->length == 0) {
                                         seg add_seg;
                                         NEW(add_seg);
                                         add_seg->mapped = 1;
                                         add_seg->segment = new_segment;
-                                        Seq_addhi(um->storage, add_seg);
-                                        um->registers[b] = (Seq_length(um->storage) - 1);
+                                        //seq_addhi(um->storage, add_seg);
+
+                                        int size = um->storage->length;
+                                        int cap = um->storage->sequenceCapacity;
+                                        if (size == cap) {
+                                                //ensureCapacity(um->storage);
+                                                int desiredCap = (um->storage->sequenceCapacity) * 2 + 2;
+                                                elem_ptr *tempSequence = malloc(sizeof(elem_ptr)*desiredCap);
+                                                
+                                                for (int i = 0; i < um->storage->sequenceCapacity; i++){
+                                                        tempSequence[i] = um->storage->sequence[i];
+                                                }
+
+                                                free(um->storage->sequence);
+                                                um->storage->sequence = tempSequence;
+
+                                                um->storage->sequenceCapacity = desiredCap;
+                                        }
+                                        
+                                        um->storage->sequence[size] = add_seg;
+                                        um->storage->length = size + 1;
+
+                                        um->registers[b] = (um->storage->length - 1);
 
                                 }
                                 else {
-                                        Umsegment_Id *id_ptr = Seq_remhi(um->avail_id);
-                                        Umsegment_Id id = *id_ptr;
+                                        //Umsegment_Id *id_ptr = seq_remhi(um->avail_id);
 
-                                        seg get_seg = Seq_get(um->storage, id);
+                                        assert(um->avail_id->length != 0);
+                                        um->avail_id->length--;
+                                        Umsegment_Id *id_ptr = um->avail_id->sequence[um->avail_id->length];
+
+                                        int id = *id_ptr;
+
+                                        //seg get_seg = seq_get(um->storage, id);
+
+                                        assert(id < um->storage->length);
+                                        assert(id >= 0);
+                                        seg get_seg = um->storage->sequence[id];
+
                                         get_seg->segment = new_segment;
                                         get_seg->mapped = 1;
 
@@ -239,26 +292,51 @@ void run_um(Um_T um)
                                 um->program_counter++;
                         }
                         else if (opcode == INACTIVATE) {
-                                uint32_t id = um->registers[c];
+                                int id = um->registers[c];
 
                                 //check_access(segments, id);
-                                if (id == program_id || Seq_length(um->storage) <= (int)id) {
+                                if (id == program_id || um->storage->length <= (int)id) {
                                         printf("poor\n");
                                         exit(1);
                                 }
-                                seg check_seg = Seq_get(um->storage, id);
+                                //seg check_seg = seq_get(um->storage, id);
+                                assert(id < um->storage->length);
+                                assert(id >= 0);
+                                seg check_seg = um->storage->sequence[id];
+
                                 if (check_seg->mapped == 0) {
                                         printf("poor\n");
                                         exit(1);
                                 }
 
                                 /* Freeing the UArray when we need to add something to its spot */
-                                seg rem_segment = Seq_get(um->storage, id);
-                                rem_segment->mapped = 0;
-                                UArray_free(&rem_segment->segment);
+                                //seg rem_segment = seq_get(um->storage, id);
+
+                                check_seg->mapped = 0;
+                                UArray_free(&check_seg->segment);
                                 Umsegment_Id *id_ptr = NEW(id_ptr);
                                 *id_ptr = id;
-                                Seq_addhi(um->avail_id, id_ptr);
+                                //seq_addhi(um->avail_id, id_ptr);
+
+                                int size = um->avail_id->length;
+                                int cap = um->avail_id->sequenceCapacity;
+                                if (size == cap) {
+                                        //ensureCapacity(um->storage);
+                                        int desiredCap = (um->avail_id->sequenceCapacity) * 2 + 2;
+                                        elem_ptr *tempSequence = malloc(sizeof(elem_ptr)*desiredCap);
+                                        
+                                        for (int i = 0; i < um->avail_id->sequenceCapacity; i++){
+                                                tempSequence[i] = um->avail_id->sequence[i];
+                                        }
+
+                                        free(um->avail_id->sequence);
+                                        um->avail_id->sequence = tempSequence;
+
+                                        um->avail_id->sequenceCapacity = desiredCap;
+                                }
+                                
+                                um->avail_id->sequence[size] = id_ptr;
+                                um->avail_id->length = size + 1;
 
                                 um->program_counter++;
                         }
@@ -283,15 +361,19 @@ void run_um(Um_T um)
                                         replace_program(um->segments, um->registers[b]);
                                         */
                                         //Paramaters
-                                        uint32_t id = um->registers[b];
+                                        int id = um->registers[b];
 
                                         // UArray_T uarray_program = get_segment(segments, id);
                                         //check_access(segments, id);
-                                        if (id == program_id || Seq_length(um->storage) <= (int)id) {
+                                        if (id == program_id || um->storage->length <= (int)id) {
                                                 printf("poor\n");
                                                 exit(1);
                                         }
-                                        seg get_seg = Seq_get(um->storage, id);
+                                        //seg get_seg = seq_get(um->storage, id);
+                                        assert(id < um->storage->length);
+                                        assert(id >= 0);
+                                        seg get_seg = um->storage->sequence[id];
+
                                         if (get_seg->mapped == 0) {
                                                 printf("poor\n");
                                                 exit(1);
@@ -300,24 +382,59 @@ void run_um(Um_T um)
                                         UArray_T uarray_program = get_seg->segment;
 
                                         int uarray_length = UArray_length(uarray_program);
-                                        Seq_T seq_program = Seq_new(uarray_length);
+                                        //Sequence_T seq_program = new_seq(uarray_length);
+
+                                        S seq;
+                                        NEW(seq);
+                                        seq->sequenceCapacity = uarray_length;
+                                        seq->sequence = malloc(sizeof(elem_ptr)*(seq->sequenceCapacity));
+                                        seq->length = 0;
+                                        Sequence_T seq_program = seq;
+
                                         for (int i = 0; i < uarray_length; i++) {
                                                 uint32_t *curr_elem = UArray_at(uarray_program, i);
                                                 uint32_t *new_elem = NEW(new_elem);
                                                 *new_elem = *curr_elem;
-                                                Seq_addhi(seq_program, new_elem);
+                                                // seq_addhi(seq_program, new_elem);
+                                                int size = seq_program->length;
+                                                int cap = seq_program->sequenceCapacity;
+                                                if (size == cap) {
+                                                        // ensureCapacity(seq_program);
+                                                        int desiredCap = (seq_program->sequenceCapacity) * 2 + 2;
+                                                        elem_ptr *tempSequence = malloc(sizeof(elem_ptr)*desiredCap);
+                                                        
+                                                        for (int i = 0; i < seq_program->sequenceCapacity; i++){
+                                                                tempSequence[i] = seq_program->sequence[i];
+                                                        }
+
+                                                        free(seq_program->sequence);
+                                                        seq_program->sequence = tempSequence;
+
+                                                        seq_program->sequenceCapacity = desiredCap;
+                                                }
+                                                
+                                                seq_program->sequence[size] = new_elem;
+                                                seq_program->length = size + 1;
                                         }
 
                                         //free_seq_elems(um->program);
-                                        int pro_length = Seq_length(um->program);
+                                        int pro_length = um->program->length;
                                         uint32_t *pro_elem;
                                         for (int i = 0; i < pro_length; i++) {
-                                                pro_elem = Seq_remhi(um->program);
+                                                //pro_elem = seq_remhi(um->program);
+                                                um->program->length--;
+                                                pro_elem = um->program->sequence[um->program->length];
                                                 FREE(pro_elem);
                                         }
-                                        Seq_free(&um->program);
+                                        //free_seq(&um->program);
+                                        free((um->program)->sequence);
+                                        FREE(um->program);
 
-                                        Seq_put(um->storage, program_id, seq_program);
+                                        //seq_put(um->storage, program_id, seq_program);
+                                        assert(program_id < um->storage->length);
+                                        assert(program_id >= 0);
+                                        um->storage->sequence[program_id] = seq_program;
+
                                         um->program = seq_program;
                                 }
                                 um->program_counter = um->registers[c];
@@ -335,11 +452,43 @@ static T new_um(void *program)
         T um_new;
         NEW(um_new);
 
-        um_new->storage = Seq_new(8);
-        um_new->avail_id = Seq_new(10);
+        //um_new->storage = new_seq(8);
+        S stor_seq;
+        NEW(stor_seq);
+        stor_seq->sequenceCapacity = 8;
+        stor_seq->sequence = malloc(sizeof(elem_ptr)*(stor_seq->sequenceCapacity));
+        stor_seq->length = 0;
+        um_new->storage = stor_seq;
+
+        //um_new->avail_id = new_seq(10);
+        S id_seq;
+        NEW(id_seq);
+        id_seq->sequenceCapacity = 10;
+        id_seq->sequence = malloc(sizeof(elem_ptr)*(id_seq->sequenceCapacity));
+        id_seq->length = 0;
+        um_new->avail_id = id_seq;
+
         um_new->program = program;
 
-        Seq_addhi(um_new->storage, um_new->program);
+        //seq_addhi(um_new->storage, um_new->program);
+        int size = um_new->storage->length;
+        int cap = um_new->storage->sequenceCapacity;
+        if (size == cap) {
+                int desiredCap = (um_new->storage->sequenceCapacity) * 2 + 2;
+                elem_ptr *tempSequence = malloc(sizeof(elem_ptr)*desiredCap);
+                
+                for (int i = 0; i < um_new->storage->sequenceCapacity; i++){
+                        tempSequence[i] = um_new->storage->sequence[i];
+                }
+
+                free(um_new->storage->sequence);
+                um_new->storage->sequence = tempSequence;
+
+                um_new->storage->sequenceCapacity = desiredCap;
+        }
+        
+        um_new->storage->sequence[size] = um_new->program;
+        um_new->storage->length = size + 1;
         
         um_new->program_counter = 0;
         for (int i = 0; i < num_registers; i++) {
@@ -359,37 +508,49 @@ static void free_um(T um)
         */
 
         //free_seq_elems(um->program);
-        int pro_length = Seq_length(um->program);
+        int pro_length = um->program->length;
         uint32_t *pro_elem;
         for (int i = 0; i < pro_length; i++) {
-                pro_elem = Seq_remhi(um->program);
+                //pro_elem = seq_remhi(um->program);
+                assert(um->program->length != 0);
+                um->program->length--;
+                pro_elem = um->program->sequence[um->program->length];
                 FREE(pro_elem);
         }
 
 
-        Seq_free(&um->program); //Stays
+        //free_seq(&um->program); //Stays
+        free((um->program)->sequence);
+        FREE(um->program);
 
         //free_mapped(um->storage);
-        int stor_length = Seq_length(um->storage);
+        int stor_length = um->storage->length;
         for (int i = 1; i < stor_length; i++) {
-                seg stor_seg = Seq_get(um->storage, i);
+                //seg stor_seg = seq_get(um->storage, i);
+                seg stor_seg = um->storage->sequence[i];
                 if (stor_seg->mapped == 1) {
                         UArray_free(&(stor_seg->segment));
                 }
                 FREE(stor_seg);
         }
 
-        Seq_free(&um->storage); // Stays
+        //free_seq(&um->storage); // Stays
+        free((um->storage)->sequence);
+        FREE(um->storage);
 
         //free_seq_elems(um->avail_id);
-        int id_length = Seq_length(um->avail_id);
+        int id_length = um->avail_id->length;
         uint32_t *id_elem;
         for (int i = 0; i < id_length; i++) {
-                id_elem = Seq_remhi(um->avail_id);
+                //id_elem = seq_remhi(um->avail_id);
+                um->avail_id->length--;
+                id_elem = um->avail_id->sequence[um->avail_id->length];
                 FREE(id_elem);
         }
 
-        Seq_free(&um->avail_id); // Same
+        //free_seq(&um->avail_id); // Same
+        free((um->avail_id)->sequence);
+        FREE(um->avail_id);
       
         FREE(um);
 }

@@ -61,10 +61,10 @@ all: umtest um seqtest
 
 ## Linking step (.o -> executable program)
 
-umtest: um.o um_load.o umtest.o 
+umtest: sequence.o um.o um_load.o umtest.o 
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)
 
-um: um_load.o execute_um.o 
+um: sequence.o um_load.o execute_um.o 
 	$(CC) $(LDFLAGS) $^ -o $@ $(LDLIBS)
 
 seqtest: sequence.o seqtest.o 

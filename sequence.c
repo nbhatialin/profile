@@ -16,68 +16,68 @@
 
 #include "sequence.h"
 
-#define T Sequence_T
+#define S Sequence_T
 
-struct T {
+struct S {
         elem_ptr *sequence;
 	int sequenceCapacity;
-	int sequenceSize;
+	int length;
 };
 
-T new_seq(int hint) 
+S new_seq(int hint) 
 {
-        T seq;
+        S seq;
         NEW(seq);
         seq->sequenceCapacity = hint;
         seq->sequence = malloc(sizeof(elem_ptr)*(seq->sequenceCapacity));
-        seq->sequenceSize = 0;
+        seq->length = 0;
         return seq;
 }
 
-int seq_length(T seq)
+int seq_length(S seq)
 {
-        return seq->sequenceSize;
+        return seq->length;
 }
 
-void seq_addhi(T seq, elem_ptr to_add)
+void seq_addhi(S seq, elem_ptr to_add)
 {
-        int size = seq->sequenceSize;
+        int size = seq->length;
         int cap = seq->sequenceCapacity;
         if (size == cap) {
                 ensureCapacity(seq);
         }
         
         seq->sequence[size] = to_add;
-        seq->sequenceSize = size + 1;
+        seq->length = size + 1;
 }
 
-elem_ptr seq_remhi(T seq)
+elem_ptr seq_remhi(S seq)
 {
-        assert(seq->sequenceSize != 0);
-        seq->sequenceSize--;
-        return seq->sequence[sequenceSize];
+        assert(seq->length != 0);
+        seq->length--;
+        return seq->sequence[seq->length];
 }
 
-elem_ptr seq_get(T seq, int index)
+elem_ptr seq_get(S seq, int index)
 {
         assert(index < seq->length);
         assert(index >= 0);
         return seq->sequence[index];
 }
 
-void seq_put(T seq, int index, elem_ptr insert)
+void seq_put(S seq, int index, elem_ptr insert)
 {
         assert(index < seq->length);
         assert(index >= 0);
         seq->sequence[index] = insert;
 }
 
-void free_seq(T seq) 
+void free_seq(S *seq) 
 {
-        free(seq->sequence);
-        FREE(seq);
+        free((*seq)->sequence);
+        FREE(*seq);
 }
-void ensureCapacity(T seq) 
+void ensureCapacity(S seq) 
 {
         int desiredCap = (seq->sequenceCapacity) * 2 + 2;
         elem_ptr *tempSequence = malloc(sizeof(elem_ptr)*desiredCap);

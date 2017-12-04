@@ -9,7 +9,7 @@ int main()
 
 	uint32_t guy = 669;
 	seq_addhi(test_seq, &guy);
-	free_seq(test_seq);
+	free_seq(&test_seq);
 
 	return 0;
 }

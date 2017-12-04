@@ -13,7 +13,7 @@
 #include <stdint.h>
 #include "mem.h"
 #include "bitpack.h"
-#include "seq.h"
+#include "sequence.h"
 
 /*
 * Takes in a file pointer and parses through, reading a byte at a time. 4 bytes
@@ -21,7 +21,7 @@
 * initial program. This program is returned as a void pointer.
 */
 void *load_um(FILE* filename) {
-        Seq_T program_segment = Seq_new(8); 
+        Sequence_T program_segment = new_seq(8); 
 
         uint32_t word = 0;
         int64_t c = getc(filename);
@@ -33,7 +33,7 @@ void *load_um(FILE* filename) {
                         count = 3;
                         uint32_t *codeword = NEW(codeword);
                         *codeword = word;
-                        Seq_addhi(program_segment, codeword);
+                        seq_addhi(program_segment, codeword);
                         word = 0;
                 }
                 c = getc(filename);
